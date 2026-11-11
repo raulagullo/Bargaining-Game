@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Two-Stage Bargaining Game</title>
+<style>
+:root{
+  --bg:#f6f4ef; --surface:#ffffff; --surface-2:#efece5; --ink:#1d1c1a; --ink-2:#5b5852; --line:#dcd7cc;
+  --p1:#1f6f78; --p1-soft:#d6ebec; --p2:#c4692b; --p2-soft:#f6e1d1;
+  --good:#2f7d4f; --bad:#b23a3a; --accent:#2b2a6b; --shadow:0 1px 2px rgba(0,0,0,.06),0 6px 20px rgba(0,0,0,.05);
+  --radius:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16161a; --surface:#202027; --surface-2:#2a2a33; --ink:#f1efe9; --ink-2:#aaa69d; --line:#3a3a44;
+    --p1:#5fb7c0; --p1-soft:#1f3a3d; --p2:#e89a62; --p2-soft:#43301f;
+    --good:#6cc28e; --bad:#e67777; --accent:#a9a7f2; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;line-height:1.45}
+body{min-height:100vh}
+button,input,select{font:inherit;color:inherit}
+h1,h2,h3{line-height:1.2;margin:0}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 48px}
+.wrap.wide{max-width:1180px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+.stack>*+*{margin-top:14px}
+.muted{color:var(--ink-2)}
+.small{font-size:.86rem}
+.eyebrow{font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);font-weight:600}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:12px 18px;border-radius:12px;font-weight:600;cursor:pointer;min-height:48px}
+.btn:hover{background:var(--surface-2)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.1)}
+@media (prefers-color-scheme: dark){.btn.primary{color:#16161a}}
+.btn.good{background:var(--good);border-color:var(--good);color:#fff}
+.btn.bad{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn.block{width:100%}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:.9rem}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.split>*{flex:1}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.8rem;font-weight:700}
+.badge.p1{background:var(--p1-soft);color:var(--p1)}
+.badge.p2{background:var(--p2-soft);color:var(--p2)}
+.badge.neutral{background:var(--surface-2);color:var(--ink-2)}
+.badge.live{background:#d9f0e1;color:#1f6a3d}
+.badge.test{background:#fbe7c4;color:#7a4d00}
+@media (prefers-color-scheme: dark){.badge.live{background:#1d3a28;color:#8fd8a8}.badge.test{background:#3f3115;color:#f0c66e}}
+.big-money{font-size:2.2rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.num{font-variant-numeric:tabular-nums}
+input[type=text],input[type=number],select{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);min-height:48px}
+input[type=range]{width:100%;accent-color:var(--accent);height:36px}
+.splitbar{display:flex;height:46px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.splitbar>div{display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;transition:flex-basis .15s}
+.splitbar .a{background:var(--p1);color:#fff}
+.splitbar .b{background:var(--p2);color:#fff}
+.legend{display:flex;justify-content:space-between;font-size:.85rem;color:var(--ink-2)}
+.center{text-align:center}
+.spinner{width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite;margin:6px auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+details summary{cursor:pointer;font-weight:600}
+details ol{padding-left:20px;margin:8px 0 0}
+.pie-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pie-chip{background:var(--surface-2);border-radius:10px;padding:8px 12px;font-weight:700}
+.arrow{color:var(--ink-2)}
+.outcome{border-radius:12px;padding:14px;font-weight:700}
+.outcome.good{background:#dff1e6;color:#1f6a3d}
+.outcome.bad{background:#f6dede;color:#8f2525}
+@media (prefers-color-scheme: dark){.outcome.good{background:#1d3a28;color:#8fd8a8}.outcome.bad{background:#3d2020;color:#f0a0a0}}
+.pay{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pay>div{border-radius:12px;padding:12px;background:var(--surface-2)}
+.err{color:var(--bad);font-weight:600}
+.banner{padding:10px 14px;border-radius:10px;font-size:.9rem}
+.banner.test{background:#fbe7c4;color:#5a3a00}
+@media (prefers-color-scheme: dark){.banner.test{background:#3f3115;color:#f0d49a}}
+
+/* Host */
+.host-grid{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+@media (max-width:900px){.host-grid{grid-template-columns:1fr}}
+.qr{display:flex;justify-content:center;padding:12px;background:#fff;border-radius:12px}
+.qr img,.qr canvas{max-width:100%;height:auto}
+.code{font-size:2.4rem;font-weight:800;letter-spacing:.18em;text-align:center;font-variant-numeric:tabular-nums}
+.url{word-break:break-all;font-size:.82rem;text-align:center}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:var(--surface-2);border-radius:12px;padding:12px}
+.stat .v{font-size:1.6rem;font-weight:800;font-variant-numeric:tabular-nums}
+.stat .l{font-size:.8rem;color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:.78rem;padding:4px 8px;border-radius:8px;background:var(--surface-2);font-variant-numeric:tabular-nums}
+.chip.done{background:#dff1e6;color:#1f6a3d}
+.chip.fail{background:#f6dede;color:#8f2525}
+@media (prefers-color-scheme: dark){.chip.done{background:#1d3a28;color:#8fd8a8}.chip.fail{background:#3d2020;color:#f0a0a0}}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:.92rem}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tab{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;cursor:pointer;font-weight:600;font-size:.9rem}
+.tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+@media (prefers-color-scheme: dark){.tab.on{color:#16161a}}
+.progress{display:flex;height:14px;border-radius:7px;overflow:hidden;background:var(--surface-2)}
+.progress>div{height:100%}
+.hist svg{width:100%;height:auto;display:block}
+.hidden{display:none!important}
+.radio-list label{display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer}
+.radio-list label+label{margin-top:8px}
+.radio-list input{margin-top:4px}
+body.present .host-side, body.present .round-ctl{display:none}
+body.present .host-grid{grid-template-columns:1fr}
+body.present{font-size:1.12rem}
+</style>
+</head>
+<body>
+<div id="app"><div class="wrap center"><div class="spinner"></div><p class="muted">Loading…</p></div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script type="module">
+/* =====================================================================
+   CONFIGURATION
+   Paste your Firebase web-app config below (see the setup guide).
+   Leave it as null to run in TEST MODE: the game then works only
+   between browser tabs on the same computer (useful for rehearsing).
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBPNpPYx2KBGd3m0wrs2FwGyrviYkV4mfw",
+    authDomain: "games-theory-project.firebaseapp.com",
+    databaseURL: "https://games-theory-project-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "games-theory-project",
+    storageBucket: "games-theory-project.firebasestorage.app",
+    messagingSenderId: "912827237617",
+    appId: "1:912827237617:web:c60893d838219f11c9d550",
+    measurementId: "G-64LE8P0W3K",
+    databaseURL: "https://games-theory-project-default-rtdb.europe-west1.firebasedatabase.app"
+  };
+
+const PIE1 = 500;               // first-stage pie, in cents ($5.00)
+const ACTIVE_MS = 60000;        // a player counts as active if seen in the last 60 s
+const HEARTBEAT_MS = 10000;
+const ROOT = 'bargaining';
+
+/* Results reported by Goeree & Holt (2001, AER), Section II.C */
+const PAPER = {
+  200: { mean: 283, sd: 29, text: 'Mean demand $2.83 (sd $0.29); 14 of 30 demands were exactly $3.00.' },
+  50:  { mean: 338, sd: null, text: 'Mean demand only $3.38; 28 of 30 demands were below $4.50 and rejections were common.' }
+};
+
+/* ---------------------------------------------------------------------
+   Backend: Firebase Realtime Database, or a localStorage test backend
+   --------------------------------------------------------------------- */
+async function makeBackend() {
+  if (FIREBASE_CONFIG) {
+    const V = '10.12.2';
+    const appMod = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`);
+    const d = await import(`https://www.gstatic.com/firebasejs/${V}/firebase-database.js`);
+    const app = appMod.initializeApp(FIREBASE_CONFIG);
+    const db = d.getDatabase(app);
+    let offset = 0;
+    d.onValue(d.ref(db, '.info/serverTimeOffset'), s => { offset = s.val() || 0; });
+    return {
+      mode: 'live',
+      now: () => Date.now() + offset,
+      get: async p => (await d.get(d.ref(db, p))).val(),
+      set: (p, v) => d.set(d.ref(db, p), v),
+      update: (p, o) => d.update(d.ref(db, p), o),
+      on: (p, cb, onErr) => d.onValue(d.ref(db, p), s => cb(s.val()), e => onErr && onErr(e))
+    };
+  }
+  const KEY = 'bgame-local-db';
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+  const save = t => localStorage.setItem(KEY, JSON.stringify(t));
+  const parts = p => p.split('/').filter(Boolean);
+  const getAt = (t, p) => parts(p).reduce((o, k) => (o == null ? null : (o[k] ?? null)), t);
+  const setAt = (t, p, v) => {
+    const ks = parts(p); let o = t;
+    for (let i = 0; i < ks.length - 1; i++) {
+      if (typeof o[ks[i]] !== 'object' || o[ks[i]] === null) o[ks[i]] = {};
+      o = o[ks[i]];
+    }
+    const last = ks[ks.length - 1];
+    if (v === null || v === undefined) delete o[last]; else o[last] = JSON.parse(JSON.stringify(v));
+  };
+  const subs = new Set();
+  const notify = () => { for (const s of [...subs]) s.check(); };
+  window.addEventListener('storage', e => { if (e.key === KEY) notify(); });
+  return {
+    mode: 'local',
+    now: () => Date.now(),
+    get: async p => getAt(load(), p),
+    set: async (p, v) => { const t = load(); setAt(t, p, v); save(t); notify(); },
+    update: async (p, o) => { const t = load(); for (const [k, v] of Object.entries(o)) setAt(t, p + '/' + k, v); save(t); notify(); },
+    on: (p, cb) => {
+      const s = { last: undefined, check() { const v = getAt(load(), p); const j = JSON.stringify(v); if (j !== s.last) { s.last = j; cb(v); } } };
+      subs.add(s); setTimeout(() => s.check(), 0);
+      return () => subs.delete(s);
+    }
+  };
+}
+
+/* ---------------------------------------------------------------------
+   Helpers
+   --------------------------------------------------------------------- */
+const $ = (sel, el = document) => el.querySelector(sel);
+const app = $('#app');
+const money = c => '$' + (Math.round(c) / 100).toFixed(2);
+const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const params = new URLSearchParams(location.search);
+const baseUrl = () => location.href.split('#')[0].split('?')[0];
+function randInt(n) { const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+function shuffle(arr) { for (let i = arr.length - 1; i > 0; i--) { const j = randInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
+function randCode(n = 4) { const A = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < n; i++) s += A[randInt(A.length)]; return s; }
+function randId() { return 'u' + Date.now().toString(36) + randCode(6).toLowerCase(); }
+function parseMoney(str, maxC) {
+  const v = parseFloat(String(str).replace(',', '.').replace('$', ''));
+  if (!isFinite(v)) return null;
+  return Math.max(0, Math.min(maxC, Math.round(v * 100)));
+}
+const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
+const sd = a => { if (a.length < 2) return null; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
+const median = a => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); const h = b.length >> 1; return b.length % 2 ? b[h] : (b[h - 1] + b[h]) / 2; };
+const pct = (n, d) => d ? Math.round(100 * n / d) + '%' : '—';
+function treatmentName(pie2) { return pie2 === 200 ? 'Treasure ($5 → $2)' : pie2 === 50 ? 'Contradiction ($5 → $0.50)' : `Custom ($5 → ${money(pie2)})`; }
+
+let db;
+
+/* =====================================================================
+   PLAYER
+   ===================================================================== */
+function playerLanding(errMsg = '') {
+  app.innerHTML = `
+  <div class="wrap stack">
+    <div class="center stack">
+      <div class="eyebrow">Game Theory · Two-stage bargaining</div>
+      <h1>Join the game</h1>
+      <p class="muted">Enter the code shown on the screen.</p>
+    </div>
+    <div class="card stack">
+      <input id="code" type="text" autocomplete="off" autocapitalize="characters" maxlength="6" placeholder="CODE" style="text-align:center;font-size:1.6rem;letter-spacing:.2em;font-weight:800">
+      ${errMsg ? `<div class="err">${esc(errMsg)}</div>` : ''}
+      <button class="btn primary block" id="go">Join</button>
+    </div>
+    <p class="center small"><a href="?host" class="muted">I'm the presenter (host panel)</a></p>
+  </div>`;
+  const go = () => { const c = $('#code').value.trim().toUpperCase(); if (c) location.search = '?s=' + encodeURIComponent(c); };
+  $('#go').onclick = go;
+  $('#code').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
+}
+
+async function runPlayer(code) {
+  const S = `${ROOT}/sessions/${code}`;
+  const meta = await db.get(S + '/meta');
+  if (!meta) return playerLanding(`No game found with code "${code}".`);
+
+  const pidKey = 'bgame-pid-' + code;
+  let pid = sessionStorage.getItem(pidKey);
+  if (!pid) { pid = randId(); sessionStorage.setItem(pidKey, pid); }
+  const existing = await db.get(`${S}/players/${pid}`);
+  await db.update(`${S}/players/${pid}`, existing ? { lastSeen: db.now() } : { joinedAt: db.now(), lastSeen: db.now() });
+  setInterval(() => { if (document.visibilityState === 'visible') db.update(`${S}/players/${pid}`, { lastSeen: db.now() }); }, HEARTBEAT_MS);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') db.update(`${S}/players/${pid}`, { lastSeen: db.now() }); });
+
+  const st = { code, S, pid, round: 0, roundInfo: null, assign: undefined, pair: null, nPlayers: 0 };
+  let unsubRound = [], lastKey = '', lastRoundSeen = 0;
+
+  db.on(`${S}/players`, v => { st.nPlayers = v ? Object.keys(v).length : 0; if (!st.round) render(true); });
+  db.on(`${S}/meta/round`, r => {
+    r = r || 0;
+    if (r === st.round) return;
+    st.round = r; st.roundInfo = null; st.assign = undefined; st.pair = null; st.roundStatus = undefined;
+    unsubRound.forEach(u => u && u()); unsubRound = [];
+    if (r) {
+      unsubRound.push(db.on(`${S}/rounds/${r}/status`, s => { st.roundStatus = s; render(); }));
+      unsubRound.push(db.on(`${S}/rounds/${r}/pie2`, p => { st.roundInfo = { pie2: p }; render(); }));
+      unsubRound.push(db.on(`${S}/rounds/${r}/assign/${pid}`, a => {
+        st.assign = a;
+        if (a && a.pair && !st.pairUnsub) {
+          st.pairUnsub = db.on(`${S}/rounds/${r}/pairs/${a.pair}`, p => { st.pair = p; render(); });
+          unsubRound.push(() => { st.pairUnsub && st.pairUnsub(); st.pairUnsub = null; });
+        }
+        render();
+      }));
+    }
+    render();
+  });
+
+  function header(role, pie2) {
+    const roleBadge = role ? `<span class="badge ${role === 1 ? 'p1' : 'p2'}">You are Player ${role}</span>` : '';
+    return `
+      <div class="row" style="justify-content:space-between">
+        <span class="eyebrow">Round ${st.round} · code ${esc(code)}</span>${roleBadge}
+      </div>
+      <div class="pie-line small">
+        <span class="pie-chip">Pie ${money(PIE1)}</span><span class="arrow">→ if rejected →</span><span class="pie-chip">${money(pie2)}</span>
+      </div>`;
+  }
+  function rules(pie2) {
+    return `<details class="card small"><summary>How the game works</summary><ol>
+      <li><b>Stage 1.</b> Player 1 proposes how to split <b>${money(PIE1)}</b>. Player 2 accepts (the split is paid) or rejects.</li>
+      <li><b>Stage 2</b> (only after a rejection). The pie shrinks to <b>${money(pie2)}</b>. Now Player 2 proposes a split and Player 1 accepts or rejects.</li>
+      <li>If Player 1 rejects in stage 2, <b>both get $0</b>.</li>
+      <li>You play once, against an anonymous classmate. Nobody will know who you were paired with.</li></ol></details>`;
+  }
+  function waiting(title, sub) {
+    return `<div class="card center stack"><div class="spinner"></div><h2>${title}</h2>${sub ? `<p class="muted">${sub}</p>` : ''}</div>`;
+  }
+
+  function render(force) {
+    const a = st.assign, p = st.pair, pie2 = st.roundInfo ? st.roundInfo.pie2 : null;
+    let view, key;
+    if (!st.round) { view = 'lobby'; key = 'lobby' + st.nPlayers; }
+    else if (st.assign === undefined || pie2 == null) { view = 'loading'; key = 'loading'; }
+    else if (!a) { view = st.roundStatus === 'closed' ? 'lobby' : 'late'; key = view + st.round + st.roundStatus; }
+    else if (a.sitout) { view = 'sitout'; key = 'sitout' + st.round; }
+    else if (!p) { view = 'loading'; key = 'loadingpair'; }
+    else { view = 'game'; key = ['game', st.round, a.role, p.stage, p.x, p.a1, p.y, p.a2, st.roundStatus].join('|'); }
+    if (key === lastKey && !force) return;
+    if (key === lastKey && view !== 'lobby') return;
+    lastKey = key;
+
+    if (view === 'lobby') {
+      app.innerHTML = `<div class="wrap stack">
+        <div class="center stack"><div class="eyebrow">Game Theory · Two-stage bargaining</div><h1>You're in!</h1></div>
+        ${waiting('Waiting for the presenter to start…', `${st.nPlayers} player${st.nPlayers === 1 ? '' : 's'} joined. You will be randomly paired with an anonymous classmate, and your role (Player 1 or Player 2) will be drawn at random.`)}
+        </div>`;
+      return;
+    }
+    if (view === 'loading') { app.innerHTML = `<div class="wrap">${waiting('Loading…')}</div>`; return; }
+    if (view === 'late') { app.innerHTML = `<div class="wrap stack">${waiting('A round is already in progress', 'You joined after the pairing. You will play in the next round.')}</div>`; return; }
+    if (view === 'sitout') { app.innerHTML = `<div class="wrap stack">${waiting('You sit out this round', 'There was an odd number of players, so one person (drawn at random) sits out. You will be included in the next round.')}</div>`; return; }
+
+    const role = a.role, pairPath = `${S}/rounds/${st.round}/pairs/${a.pair}`;
+    const closed = st.roundStatus === 'closed';
+    const newRoundNote = st.round > 1 && p.stage === 's1_offer' && !closed ? `<div class="banner test">New round: you have a <b>new anonymous partner</b> and your role was drawn again.</div>` : '';
+    let body = '';
+
+    if (p.stage === 'done') {
+      const mine = role === 1 ? p.pay1 : p.pay2, theirs = role === 1 ? p.pay2 : p.pay1;
+      const msg = p.outcome === 'agree1' ? 'Agreement in stage 1' : p.outcome === 'agree2' ? 'Agreement in stage 2 (after the pie shrank)' : 'No agreement: both get $0';
+      body = `<div class="card stack">
+        <div class="outcome ${p.outcome === 'disagree' ? 'bad' : 'good'}">${msg}</div>
+        <div class="pay"><div><div class="small muted">You earned</div><div class="big-money">${money(mine)}</div></div>
+        <div><div class="small muted">Your partner earned</div><div class="big-money">${money(theirs)}</div></div></div>
+        <p class="muted small">Thanks for playing! Keep this screen open: if there is another round you will be re-paired automatically.</p></div>`;
+    } else if (closed) {
+      body = `<div class="card center stack"><h2>Round ended</h2><p class="muted">The presenter closed this round before your pair finished. Wait for the next round.</p></div>`;
+    } else if (p.stage === 's1_offer') {
+      body = role === 1 ? proposalForm(1, PIE1, 'Make your proposal', `Split <b>${money(PIE1)}</b>. Choose how much you keep; the rest is offered to Player 2. If Player 2 rejects, the pie shrinks to <b>${money(pie2)}</b> and Player 2 makes the proposal.`)
+                        : waiting('Player 1 is making a proposal…', `You will then accept or reject it. If you reject, the pie shrinks to ${money(pie2)} and you get to propose.`);
+    } else if (p.stage === 's1_resp') {
+      body = role === 2 ? responseForm(p.x, PIE1 - p.x, 1, `If you reject, the pie shrinks to <b>${money(pie2)}</b> and <b>you</b> propose how to split it. If Player 1 then rejects, both get $0.`)
+                        : waiting('Waiting for Player 2…', `You proposed: you ${money(p.x)}, Player 2 ${money(PIE1 - p.x)}.`);
+    } else if (p.stage === 's2_offer') {
+      body = role === 2 ? proposalForm(2, pie2, 'Stage 2: your proposal', `You rejected. The pie is now <b>${money(pie2)}</b>. Choose how much you keep; the rest goes to Player 1. If Player 1 rejects, <b>both get $0</b>.`)
+                        : waiting('Player 2 rejected your proposal', `The pie shrank to ${money(pie2)}. Player 2 is now making a proposal; you will accept or reject it.`);
+    } else if (p.stage === 's2_resp') {
+      body = role === 1 ? responseForm(pie2 - p.y, p.y, 2, `This is the last stage. If you reject, <b>both get $0</b>.`)
+                        : waiting('Waiting for Player 1…', `You proposed: you ${money(p.y)}, Player 1 ${money(pie2 - p.y)}.`);
+    }
+
+    app.innerHTML = `<div class="wrap stack">${header(role, pie2)}${newRoundNote}${body}${rules(pie2)}</div>`;
+    bindForms(role, pie2, pairPath, p);
+  }
+
+  function proposalForm(role, pieC, title, help) {
+    const other = role === 1 ? 2 : 1;
+    const start = Math.round(pieC / 2);
+    return `<div class="card stack" id="propose" data-pie="${pieC}">
+      <h2>${title}</h2><p class="muted">${help}</p>
+      <label class="small muted" for="amt">You keep (in $)</label>
+      <input id="amt" type="text" inputmode="decimal" value="${(start / 100).toFixed(2)}">
+      <input id="rng" type="range" min="0" max="${pieC}" step="1" value="${start}" aria-label="Amount you keep">
+      <div class="splitbar"><div class="${role === 1 ? 'a' : 'b'}" id="barMe"></div><div class="${role === 1 ? 'b' : 'a'}" id="barOther"></div></div>
+      <div class="legend"><span>You (Player ${role})</span><span>Player ${other}</span></div>
+      <button class="btn primary block" id="send">Send proposal</button>
+    </div>`;
+  }
+  function responseForm(p1Gets, p2Gets, proposer, help) {
+    const youGet = proposer === 1 ? p2Gets : p1Gets, theyGet = proposer === 1 ? p1Gets : p2Gets;
+    const total = p1Gets + p2Gets || 1;
+    const meCls = proposer === 1 ? 'b' : 'a', otherCls = proposer === 1 ? 'a' : 'b';
+    return `<div class="card stack">
+      <h2>Player ${proposer} proposes:</h2>
+      <div class="pay"><div><div class="small muted">You get</div><div class="big-money">${money(youGet)}</div></div>
+      <div><div class="small muted">Player ${proposer} gets</div><div class="big-money">${money(theyGet)}</div></div></div>
+      <div class="splitbar"><div class="${meCls}" style="flex-basis:${100 * youGet / total}%">${youGet ? 'You' : ''}</div><div class="${otherCls}" style="flex-basis:${100 * theyGet / total}%">${theyGet ? 'Player ' + proposer : ''}</div></div>
+      <p class="muted">${help}</p>
+      <div class="row split"><button class="btn good" id="acc">Accept</button><button class="btn bad" id="rej">Reject</button></div>
+    </div>`;
+  }
+
+  function bindForms(role, pie2, pairPath, p) {
+    const prop = $('#propose');
+    if (prop) {
+      const pieC = +prop.dataset.pie, amt = $('#amt'), rng = $('#rng');
+      const paint = c => {
+        $('#barMe').style.flexBasis = (100 * c / pieC) + '%'; $('#barOther').style.flexBasis = (100 * (pieC - c) / pieC) + '%';
+        $('#barMe').textContent = c ? money(c) : ''; $('#barOther').textContent = pieC - c ? money(pieC - c) : '';
+      };
+      paint(+rng.value);
+      rng.oninput = () => { amt.value = (rng.value / 100).toFixed(2); paint(+rng.value); };
+      amt.oninput = () => { const c = parseMoney(amt.value, pieC); if (c != null) { rng.value = c; paint(c); } };
+      amt.onblur = () => { const c = parseMoney(amt.value, pieC); amt.value = ((c ?? +rng.value) / 100).toFixed(2); };
+      $('#send').onclick = async () => {
+        const c = parseMoney(amt.value, pieC); if (c == null) { amt.focus(); return; }
+        $('#send').disabled = true;
+        const fresh = await db.get(pairPath);
+        if (role === 1 && fresh.stage === 's1_offer') await db.update(pairPath, { x: c, stage: 's1_resp', t1: db.now() });
+        if (role === 2 && fresh.stage === 's2_offer') await db.update(pairPath, { y: c, stage: 's2_resp', t3: db.now() });
+      };
+    }
+    const acc = $('#acc'), rej = $('#rej');
+    if (acc) {
+      const decide = async ok => {
+        acc.disabled = rej.disabled = true;
+        const fresh = await db.get(pairPath);
+        if (role === 2 && fresh.stage === 's1_resp') {
+          await db.update(pairPath, ok ? { a1: true, stage: 'done', outcome: 'agree1', pay1: fresh.x, pay2: PIE1 - fresh.x, t2: db.now() }
+                                       : { a1: false, stage: 's2_offer', t2: db.now() });
+        }
+        if (role === 1 && fresh.stage === 's2_resp') {
+          await db.update(pairPath, ok ? { a2: true, stage: 'done', outcome: 'agree2', pay1: pie2 - fresh.y, pay2: fresh.y, t4: db.now() }
+                                       : { a2: false, stage: 'done', outcome: 'disagree', pay1: 0, pay2: 0, t4: db.now() });
+        }
+      };
+      acc.onclick = () => decide(true); rej.onclick = () => decide(false);
+    }
+  }
+  render(true);
+}
+
+/* =====================================================================
+   HOST
+   ===================================================================== */
+async function runHost() {
+  let code = localStorage.getItem('bgame-host-code');
+  if (!code || !(await db.get(`${ROOT}/sessions/${code}/meta`))) code = await createSession();
+  hostUI(code);
+}
+async function createSession() {
+  let code;
+  for (let i = 0; i < 10; i++) { code = randCode(4); if (!(await db.get(`${ROOT}/sessions/${code}/meta`))) break; }
+  await db.set(`${ROOT}/sessions/${code}/meta`, { createdAt: db.now(), round: 0 });
+  localStorage.setItem('bgame-host-code', code);
+  return code;
+}
+
+function hostUI(code) {
+  const S = `${ROOT}/sessions/${code}`;
+  const joinUrl = baseUrl() + '?s=' + code;
+  const st = { meta: null, players: {}, rounds: {}, view: null };
+
+  app.innerHTML = `
+  <div class="wrap wide stack">
+    <div class="row" style="justify-content:space-between">
+      <div><div class="eyebrow">Goeree &amp; Holt (2001) · Game II.C</div><h1>Two-Stage Bargaining: host panel</h1></div>
+      <div class="row">
+        <span class="badge ${db.mode === 'live' ? 'live' : 'test'}">${db.mode === 'live' ? 'Live (Firebase)' : 'Test mode'}</span>
+        <button class="btn sm" id="present">Presentation view</button>
+        <button class="btn sm" id="csv">Export CSV</button>
+        <button class="btn sm" id="newSess">New session</button>
+      </div>
+    </div>
+    ${db.mode === 'local' ? `<div class="banner test"><b>Test mode.</b> No Firebase config yet, so the game only works between tabs of this browser on this computer. Open the join link in a few new tabs to rehearse. Add your Firebase config to play with the class.</div>` : ''}
+    <div class="host-grid">
+      <div class="stack host-side">
+        <div class="card stack">
+          <div class="eyebrow center">Scan to join</div>
+          <div class="qr" id="qr"></div>
+          <div class="code">${code}</div>
+          <div class="url"><a href="${esc(joinUrl)}" target="_blank" rel="noopener">${esc(joinUrl)}</a></div>
+        </div>
+        <div class="card stats">
+          <div class="stat"><div class="v" id="nActive">0</div><div class="l">active now</div></div>
+          <div class="stat"><div class="v" id="nJoined">0</div><div class="l">joined in total</div></div>
+        </div>
+      </div>
+      <div class="stack">
+        <div class="card stack round-ctl">
+          <div class="row" style="justify-content:space-between"><h2>Rounds</h2><span id="roundState" class="badge neutral">No round yet</span></div>
+          <div class="radio-list">
+            <label><input type="radio" name="tr" value="200" checked><span><b>Treasure:</b> $5.00 → $2.00<br><span class="small muted">SPE: Player 1 demands $3.00 (60% of the pie)</span></span></label>
+            <label><input type="radio" name="tr" value="50"><span><b>Contradiction:</b> $5.00 → $0.50<br><span class="small muted">SPE: Player 1 demands $4.50 (90% of the pie)</span></span></label>
+            <label><input type="radio" name="tr" value="custom"><span><b>Custom</b> second-stage pie: <input id="customPie" type="text" inputmode="decimal" value="1.00" style="display:inline-block;width:90px;min-height:34px;padding:4px 8px"></span></label>
+          </div>
+          <div class="row">
+            <button class="btn primary" id="start">Pair players &amp; start round</button>
+            <button class="btn" id="end">End current round</button>
+          </div>
+          <p class="small muted" id="startHint">Players are paired at random among those active in the last minute; roles are drawn at random. With an odd number, one random player sits out.</p>
+        </div>
+        <div class="card stack" id="live"></div>
+        <div class="card stack" id="results"></div>
+      </div>
+    </div>
+  </div>`;
+
+  // QR code
+  const qrEl = $('#qr');
+  if (window.QRCode) new window.QRCode(qrEl, { text: joinUrl, width: 280, height: 280, correctLevel: window.QRCode.CorrectLevel.M });
+  else qrEl.innerHTML = `<img alt="QR code to join" width="280" height="280" src="https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(joinUrl)}">`;
+  if (location.protocol === 'file:') qrEl.insertAdjacentHTML('afterend', '<p class="small muted center">This page is opened as a local file, so phones cannot use this QR. Host it online first (see the guide).</p>');
+
+  $('#newSess').onclick = async () => {
+    if (!confirm('Start a brand-new session with a new code? (The current results stay in the database; export the CSV first if you need them.)')) return;
+    const c = await createSession(); hostUI(c);
+  };
+  $('#present').onclick = () => { document.body.classList.toggle('present'); $('#present').textContent = document.body.classList.contains('present') ? 'Exit presentation view' : 'Presentation view'; };
+  $('#csv').onclick = () => exportCsv(code, st.rounds);
+  $('#start').onclick = startRound;
+  $('#end').onclick = async () => {
+    const r = st.meta && st.meta.round; if (!r) return;
+    if (st.rounds[r] && st.rounds[r].status === 'closed') return;
+    if (!confirm(`End round ${r}? Pairs that have not finished will be marked as incomplete.`)) return;
+    await db.update(`${S}/rounds/${r}`, { status: 'closed', endedAt: db.now() });
+  };
+
+  async function startRound() {
+    const sel = document.querySelector('input[name=tr]:checked').value;
+    let pie2 = sel === 'custom' ? parseMoney($('#customPie').value, PIE1) : +sel;
+    if (pie2 == null || pie2 <= 0 || pie2 >= PIE1) { alert('The second-stage pie must be between $0.01 and $4.99.'); return; }
+    const players = (await db.get(`${S}/players`)) || {};
+    const now = db.now();
+    const active = Object.entries(players).filter(([, p]) => now - (p.lastSeen || 0) < ACTIVE_MS).map(([id]) => id);
+    if (active.length < 2) { alert('At least 2 active players are needed.'); return; }
+    const meta = (await db.get(`${S}/meta`)) || {};
+    const prev = meta.round || 0, r = prev + 1;
+    if (prev && st.rounds[prev] && st.rounds[prev].status !== 'closed') {
+      if (!confirm(`Round ${prev} is still running. Close it and start round ${r}?`)) return;
+    }
+    shuffle(active);
+    const pairs = {}, assign = {};
+    let k = 0;
+    for (let i = 0; i + 1 < active.length; i += 2) {
+      k++; const id = 'p' + String(k).padStart(2, '0');
+      pairs[id] = { p1: active[i], p2: active[i + 1], stage: 's1_offer', created: now };
+      assign[active[i]] = { pair: id, role: 1 };
+      assign[active[i + 1]] = { pair: id, role: 2 };
+    }
+    if (active.length % 2) assign[active[active.length - 1]] = { sitout: true };
+    const upd = {};
+    if (prev) { upd[`rounds/${prev}/status`] = 'closed'; }
+    upd[`rounds/${r}`] = { pie1: PIE1, pie2, status: 'open', startedAt: now, pairs, assign };
+    upd['meta/round'] = r;
+    await db.update(S, upd);
+    st.view = r;
+  }
+
+  db.on(`${S}/meta`, m => { st.meta = m; paint(); });
+  db.on(`${S}/players`, p => { st.players = p || {}; paintCounts(); });
+  db.on(`${S}/rounds`, r => { st.rounds = r || {}; paint(); });
+  setInterval(paintCounts, 3000);
+
+  function paintCounts() {
+    const now = db.now(), ps = Object.values(st.players);
+    $('#nJoined').textContent = ps.length;
+    $('#nActive').textContent = ps.filter(p => now - (p.lastSeen || 0) < ACTIVE_MS).length;
+  }
+
+  function paint() {
+    const r = st.meta ? st.meta.round : 0;
+    const cur = r ? st.rounds[r] : null;
+    $('#roundState').textContent = cur ? `Round ${r} · ${cur.status === 'open' ? 'in progress' : 'ended'}` : 'No round yet';
+    $('#roundState').className = 'badge ' + (cur && cur.status === 'open' ? 'live' : 'neutral');
+    $('#end').disabled = !cur || cur.status !== 'open';
+    $('#start').textContent = r ? `Re-pair players & start round ${r + 1}` : 'Pair players & start round 1';
+    paintLive(r, cur);
+    paintResults();
+  }
+
+  function paintLive(r, cur) {
+    const el = $('#live');
+    if (!cur) { el.innerHTML = `<h2>Live progress</h2><p class="muted">Start a round to see each pair's progress here.</p>`; return; }
+    const pairs = Object.entries(cur.pairs || {});
+    const sitouts = Object.values(cur.assign || {}).filter(a => a.sitout).length;
+    const c = { s1_offer: 0, s1_resp: 0, s2_offer: 0, s2_resp: 0, done: 0 };
+    pairs.forEach(([, p]) => c[p.stage]++);
+    const n = pairs.length || 1;
+    const labels = { s1_offer: 'P1 proposing', s1_resp: 'P2 deciding', s2_offer: 'Stage 2: P2 proposing', s2_resp: 'Stage 2: P1 deciding', done: 'Finished' };
+    const colors = { s1_offer: 'var(--line)', s1_resp: 'var(--p2-soft)', s2_offer: 'var(--p2)', s2_resp: 'var(--p1)', done: 'var(--good)' };
+    el.innerHTML = `
+      <div class="row" style="justify-content:space-between"><h2>Live progress · round ${r}</h2>
+      <span class="muted">${treatmentName(cur.pie2)} · ${pairs.length} pairs${sitouts ? ` · ${sitouts} sitting out` : ''}</span></div>
+      <div class="progress">${Object.keys(c).map(s => `<div style="width:${100 * c[s] / n}%;background:${colors[s]}" title="${labels[s]}: ${c[s]}"></div>`).join('')}</div>
+      <div class="row small">${Object.keys(c).map(s => `<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${colors[s]};margin-right:5px"></span>${labels[s]}: <b>${c[s]}</b></span>`).join('')}</div>
+      <div class="chips">${pairs.map(([id, p]) => {
+        const cls = p.stage === 'done' ? (p.outcome === 'disagree' ? 'fail' : 'done') : '';
+        const txt = p.stage === 'done' ? (p.outcome === 'agree1' ? `✓ S1 ${money(p.x)}` : p.outcome === 'agree2' ? `✓ S2` : '✗ no deal') : labels[p.stage];
+        return `<span class="chip ${cls}">#${id.slice(1)} ${txt}</span>`;
+      }).join('')}</div>`;
+  }
+
+  function roundStats(rd) {
+    const pairs = Object.values(rd.pairs || {});
+    const offered = pairs.filter(p => p.x != null);
+    const xs = offered.map(p => p.x);
+    const decided1 = pairs.filter(p => p.a1 != null);
+    const acc1 = decided1.filter(p => p.a1 === true).length;
+    const rej1 = decided1.filter(p => p.a1 === false);
+    const ys = pairs.filter(p => p.y != null).map(p => p.y);
+    const decided2 = pairs.filter(p => p.a2 != null);
+    const acc2 = decided2.filter(p => p.a2 === true).length;
+    const done = pairs.filter(p => p.stage === 'done');
+    const spe = PIE1 - rd.pie2;
+    return {
+      nPairs: pairs.length, nOffers: xs.length, xs, meanX: mean(xs), sdX: sd(xs), medX: median(xs),
+      atSpe: xs.filter(x => Math.abs(x - spe) <= 1).length, belowSpe: xs.filter(x => x < spe - 1).length, aboveSpe: xs.filter(x => x > spe + 1).length,
+      nDecided1: decided1.length, acc1, nRej1: rej1.length,
+      acceptedX: mean(decided1.filter(p => p.a1).map(p => p.x)), rejectedX: mean(rej1.map(p => p.x)),
+      ys, meanY: mean(ys), nDecided2: decided2.length, acc2,
+      nDone: done.length, disagree: done.filter(p => p.outcome === 'disagree').length,
+      meanPay1: mean(done.map(p => p.pay1)), meanPay2: mean(done.map(p => p.pay2)),
+      efficiency: done.length ? mean(done.map(p => (p.pay1 + p.pay2) / PIE1)) : null, spe
+    };
+  }
+
+  function hist(xs, spe, paperMean, classMean) {
+    const W = 640, H = 240, L = 36, R = 12, T = 18, B = 34, bins = 20, bw = PIE1 / bins;
+    const counts = Array(bins).fill(0); xs.forEach(x => counts[Math.min(bins - 1, Math.floor(x / bw))]++);
+    const maxC = Math.max(1, ...counts);
+    const sx = v => L + (W - L - R) * v / PIE1, sy = c => T + (H - T - B) * (1 - c / maxC);
+    const bars = counts.map((c, i) => c ? `<rect x="${sx(i * bw) + 1}" y="${sy(c)}" width="${sx(bw) - L - 2}" height="${H - B - sy(c)}" rx="3" fill="var(--p1)"><title>${money(i * bw)}–${money((i + 1) * bw)}: ${c}</title></rect><text x="${sx(i * bw + bw / 2)}" y="${sy(c) - 4}" text-anchor="middle" font-size="11" fill="var(--ink-2)">${c}</text>` : '').join('');
+    const ticks = [0, 1, 2, 3, 4, 5].map(d => `<line x1="${sx(d * 100)}" x2="${sx(d * 100)}" y1="${H - B}" y2="${H - B + 4}" stroke="var(--ink-2)"/><text x="${sx(d * 100)}" y="${H - B + 18}" text-anchor="middle" font-size="12" fill="var(--ink-2)">$${d}</text>`).join('');
+    const vline = (v, col, dash) => v == null ? '' : `<line x1="${sx(v)}" x2="${sx(v)}" y1="${T - 8}" y2="${H - B}" stroke="${col}" stroke-width="2.5" ${dash ? 'stroke-dasharray="6 4"' : ''}/>`;
+    const key = (col, dash, lab) => `<span style="display:inline-flex;align-items:center;gap:6px"><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" stroke="${col}" stroke-width="3" ${dash ? 'stroke-dasharray="6 4"' : ''}/></svg>${lab}</span>`;
+    return `<div class="row small" style="gap:18px">
+        ${key('var(--bad)', false, `<b>SPE prediction</b> ${money(spe)}`)}
+        ${paperMean != null ? key('var(--p2)', true, `<b>Paper mean</b> ${money(paperMean)}`) : ''}
+        ${classMean != null ? key('var(--accent)', true, `<b>Class mean</b> ${money(classMean)}`) : ''}
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Histogram of Player 1 demands">
+      <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="var(--line)"/>
+      ${bars}${ticks}
+      ${vline(spe, 'var(--bad)', false)}${vline(paperMean, 'var(--p2)', true)}${vline(classMean, 'var(--accent)', true)}
+      <text x="${(L + W - R) / 2}" y="${H - 2}" text-anchor="middle" font-size="12" fill="var(--ink-2)">Player 1's stage-1 demand (out of $5.00) · bars = number of pairs</text>
+    </svg>`;
+  }
+
+  function paintResults() {
+    const el = $('#results');
+    const ids = Object.keys(st.rounds).map(Number).sort((a, b) => a - b);
+    if (!ids.length) { el.innerHTML = `<h2>Results</h2><p class="muted">Results will appear here as pairs play.</p>`; return; }
+    if (st.view === 'all' && ids.length < 2) st.view = null;
+    if (st.view !== 'all' && (!st.view || !st.rounds[st.view])) st.view = ids[ids.length - 1];
+    if (st.view === 'all') {
+      paintCompare(el, ids);
+      el.querySelectorAll('.tab').forEach(b => b.onclick = () => { st.view = b.dataset.r === 'all' ? 'all' : +b.dataset.r; paintResults(); });
+      return;
+    }
+    const rd = st.rounds[st.view], s = roundStats(rd), paper = PAPER[rd.pie2];
+    const f = v => v == null ? '—' : money(v);
+    const share = v => v == null ? '' : ` <span class="muted small">(${Math.round(100 * v / PIE1)}%)</span>`;
+    el.innerHTML = `
+      <div class="row" style="justify-content:space-between"><h2>Results</h2>
+        <div class="tabs">${ids.map(i => `<button class="tab ${i === st.view ? 'on' : ''}" data-r="${i}">Round ${i}</button>`).join('')}${ids.length > 1 ? `<button class="tab ${st.view === 'all' ? 'on' : ''}" data-r="all">Compare</button>` : ''}</div></div>
+      <div class="muted">${treatmentName(rd.pie2)} · ${s.nDone} of ${s.nPairs} pairs finished</div>
+      <div class="stats">
+        <div class="stat"><div class="v">${f(s.meanX)}</div><div class="l">Mean P1 demand${s.meanX != null ? ` (${Math.round(100 * s.meanX / PIE1)}% of pie)` : ''}</div></div>
+        <div class="stat"><div class="v">${f(s.spe)}</div><div class="l">SPE prediction (${Math.round(100 * s.spe / PIE1)}%)</div></div>
+        <div class="stat"><div class="v">${pct(s.acc1, s.nDecided1)}</div><div class="l">Accepted in stage 1 (${s.acc1}/${s.nDecided1})</div></div>
+        <div class="stat"><div class="v">${s.disagree}</div><div class="l">Pairs with no deal ($0 each)</div></div>
+      </div>
+      <div class="hist">${hist(s.xs, s.spe, paper ? paper.mean : null, s.meanX)}</div>
+      <table>
+        <thead><tr><th></th><th>Theory (SPE)</th><th>Goeree &amp; Holt</th><th>Our class</th></tr></thead>
+        <tbody>
+          <tr><td>Mean P1 demand</td><td>${money(s.spe)}${share(s.spe)}</td><td>${paper ? money(paper.mean) + share(paper.mean) : '—'}</td><td><b>${f(s.meanX)}</b>${share(s.meanX)}</td></tr>
+          <tr><td>Std. deviation</td><td>0</td><td>${paper && paper.sd ? money(paper.sd) : '—'}</td><td>${f(s.sdX)}</td></tr>
+          <tr><td>Median demand</td><td>${money(s.spe)}</td><td>—</td><td>${f(s.medX)}</td></tr>
+          <tr><td>Demands at / below / above SPE</td><td>all at SPE</td><td>${rd.pie2 === 200 ? '14 of 30 at $3.00' : rd.pie2 === 50 ? '28 of 30 below' : '—'}</td><td>${s.atSpe} / ${s.belowSpe} / ${s.aboveSpe}</td></tr>
+          <tr><td>Rejections in stage 1</td><td>none</td><td>${rd.pie2 === 50 ? 'common' : rd.pie2 === 200 ? 'few' : '—'}</td><td>${s.nRej1} of ${s.nDecided1}</td></tr>
+          <tr><td>Mean demand when accepted / rejected</td><td>—</td><td>—</td><td>${f(s.acceptedX)} / ${f(s.rejectedX)}</td></tr>
+          <tr><td>Stage 2: P2's mean demand</td><td>${money(rd.pie2 - 1)} (all but 1¢)</td><td>—</td><td>${f(s.meanY)}${s.ys.length ? ` <span class="muted small">(n=${s.ys.length})</span>` : ''}</td></tr>
+          <tr><td>Stage 2: accepted by P1</td><td>yes</td><td>—</td><td>${s.nDecided2 ? `${s.acc2} of ${s.nDecided2}` : '—'}</td></tr>
+          <tr><td>Mean payoff P1 / P2</td><td>${money(s.spe)} / ${money(rd.pie2)}</td><td>—</td><td>${f(s.meanPay1)} / ${f(s.meanPay2)}</td></tr>
+          <tr><td>Efficiency (share of $5 actually paid)</td><td>100%</td><td>—</td><td>${s.efficiency == null ? '—' : Math.round(100 * s.efficiency) + '%'}</td></tr>
+        </tbody>
+      </table>
+      ${paper ? `<p class="small muted"><b>Paper:</b> ${paper.text}</p>` : ''}`;
+    el.querySelectorAll('.tab').forEach(b => b.onclick = () => { st.view = b.dataset.r === 'all' ? 'all' : +b.dataset.r; paintResults(); });
+  }
+
+  function paintCompare(el, ids) {
+    const rows = ids.map(i => { const rd = st.rounds[i], s = roundStats(rd), paper = PAPER[rd.pie2];
+      return `<tr><td>Round ${i}</td><td>${treatmentName(rd.pie2)}</td><td>${money(s.spe)}</td><td>${paper ? money(paper.mean) : '—'}</td><td><b>${s.meanX == null ? '—' : money(s.meanX)}</b></td><td>${s.meanX == null ? '—' : Math.round(100 * s.meanX / PIE1) + '%'} vs ${Math.round(100 * s.spe / PIE1)}%</td><td>${s.nRej1}/${s.nDecided1}</td><td>${s.nOffers}</td></tr>`; }).join('');
+    el.innerHTML = `
+      <div class="row" style="justify-content:space-between"><h2>Results</h2>
+        <div class="tabs">${ids.map(i => `<button class="tab" data-r="${i}">Round ${i}</button>`).join('')}<button class="tab on" data-r="all">Compare</button></div></div>
+      <p class="muted">Does the class move its demand as much as theory says when the cost of delay changes?</p>
+      <table><thead><tr><th>Round</th><th>Treatment</th><th>SPE</th><th>Paper mean</th><th>Class mean</th><th>Class vs SPE share</th><th>Stage-1 rejections</th><th>n</th></tr></thead><tbody>${rows}</tbody></table>`;
+  }
+}
+
+function exportCsv(code, rounds) {
+  const head = ['session', 'round', 'pie1', 'pie2', 'spe_demand', 'pair', 'final_stage', 'outcome', 'p1_demand_stage1', 'offer_to_p2_stage1', 'p2_response_stage1', 'p2_demand_stage2', 'offer_to_p1_stage2', 'p1_response_stage2', 'payoff_p1', 'payoff_p2'];
+  const d = c => c == null ? '' : (c / 100).toFixed(2);
+  const yn = v => v == null ? '' : v ? 'accept' : 'reject';
+  const lines = [head.join(',')];
+  Object.keys(rounds).map(Number).sort((a, b) => a - b).forEach(r => {
+    const rd = rounds[r];
+    Object.entries(rd.pairs || {}).sort().forEach(([id, p]) => {
+      lines.push([code, r, d(rd.pie1 || PIE1), d(rd.pie2), d(PIE1 - rd.pie2), id, p.stage, p.outcome || 'incomplete',
+        d(p.x), p.x == null ? '' : d(PIE1 - p.x), yn(p.a1), d(p.y), p.y == null ? '' : d(rd.pie2 - p.y), yn(p.a2), d(p.pay1), d(p.pay2)].join(','));
+    });
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `bargaining-results-${code}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+(async () => {
+  try { db = await makeBackend(); }
+  catch (e) { app.innerHTML = `<div class="wrap"><div class="card"><h2>Could not connect</h2><p class="err">${esc(e.message || e)}</p><p class="muted">Check the Firebase configuration at the top of the file.</p></div></div>`; return; }
+  try {
+    if (params.has('host')) await runHost();
+    else if (params.get('s')) await runPlayer(params.get('s').trim().toUpperCase());
+    else playerLanding();
+  } catch (e) {
+    console.error(e);
+    app.innerHTML = `<div class="wrap"><div class="card"><h2>Something went wrong</h2><p class="err">${esc(e.message || e)}</p><p class="muted">If you are the host, check the database rules (see the setup guide).</p><button class="btn" onclick="location.reload()">Reload</button></div></div>`;
+  }
+})();
+</script>
+</body>
+</html>
