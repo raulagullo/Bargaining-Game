@@ -8,14 +8,14 @@
 :root{
   --bg:#f6f4ef; --surface:#ffffff; --surface-2:#efece5; --ink:#1d1c1a; --ink-2:#5b5852; --line:#dcd7cc;
   --p1:#1f6f78; --p1-soft:#d6ebec; --p2:#c4692b; --p2-soft:#f6e1d1;
-  --good:#2f7d4f; --bad:#b23a3a; --accent:#2b2a6b; --shadow:0 1px 2px rgba(0,0,0,.06),0 6px 20px rgba(0,0,0,.05);
+  --bar:#5b9bd5; --good:#2f7d4f; --bad:#b23a3a; --accent:#2b2a6b; --shadow:0 1px 2px rgba(0,0,0,.06),0 6px 20px rgba(0,0,0,.05);
   --radius:14px;
 }
 @media (prefers-color-scheme: dark){
   :root{
     --bg:#16161a; --surface:#202027; --surface-2:#2a2a33; --ink:#f1efe9; --ink-2:#aaa69d; --line:#3a3a44;
     --p1:#5fb7c0; --p1-soft:#1f3a3d; --p2:#e89a62; --p2-soft:#43301f;
-    --good:#6cc28e; --bad:#e67777; --accent:#a9a7f2; --shadow:none;
+    --bar:#8cc4f5; --good:#6cc28e; --bad:#e67777; --accent:#a9a7f2; --shadow:none;
   }
 }
 *{box-sizing:border-box}
@@ -134,7 +134,6 @@ const FIREBASE_CONFIG = {
     measurementId: "G-64LE8P0W3K",
     databaseURL: "https://games-theory-project-default-rtdb.europe-west1.firebasedatabase.app"
   };
-
 
 const PIE1 = 500;               // first-stage pie, in cents ($5.00)
 const ACTIVE_MS = 90000;        // a connected player counts as active if seen in the last 90 s
@@ -639,10 +638,10 @@ function hostUI(code) {
     const counts = Array(bins).fill(0); xs.forEach(x => counts[Math.min(bins - 1, Math.floor(x / bw))]++);
     const maxC = Math.max(1, ...counts);
     const sx = v => L + (W - L - R) * v / PIE1, sy = c => T + (H - T - B) * (1 - c / maxC);
-    const bars = counts.map((c, i) => c ? `<rect x="${sx(i * bw) + 1}" y="${sy(c)}" width="${sx(bw) - L - 2}" height="${H - B - sy(c)}" rx="3" fill="var(--p1)"><title>${money(i * bw)}–${money((i + 1) * bw)}: ${c}</title></rect><text x="${sx(i * bw + bw / 2)}" y="${sy(c) - 4}" text-anchor="middle" font-size="11" fill="var(--ink-2)">${c}</text>` : '').join('');
+    const bars = counts.map((c, i) => c ? `<rect x="${sx(i * bw) + 1}" y="${sy(c)}" width="${sx(bw) - L - 2}" height="${H - B - sy(c)}" rx="3" fill="var(--bar)" fill-opacity="0.45" stroke="var(--bar)" stroke-opacity="0.8"><title>${money(i * bw)}–${money((i + 1) * bw)}: ${c}</title></rect><text x="${sx(i * bw + bw / 2)}" y="${sy(c) - 4}" text-anchor="middle" font-size="11" fill="var(--ink-2)">${c}</text>` : '').join('');
     const ticks = [0, 1, 2, 3, 4, 5].map(d => `<line x1="${sx(d * 100)}" x2="${sx(d * 100)}" y1="${H - B}" y2="${H - B + 4}" stroke="var(--ink-2)"/><text x="${sx(d * 100)}" y="${H - B + 18}" text-anchor="middle" font-size="12" fill="var(--ink-2)">$${d}</text>`).join('');
     const vline = (v, col, dash) => v == null ? '' : `<line x1="${sx(v)}" x2="${sx(v)}" y1="${T - 8}" y2="${H - B}" stroke="${col}" stroke-width="2.5" ${dash ? 'stroke-dasharray="6 4"' : ''}/>`;
-    const key = (col, dash, lab) => `<span style="display:inline-flex;align-items:center;gap:6px"><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" stroke="${col}" stroke-width="3" ${dash ? 'stroke-dasharray="6 4"' : ''}/></svg>${lab}</span>`;
+    const key = (col, dash, lab) => `<span style="display:inline-flex;align-items:center;gap:6px;white-space:nowrap"><svg width="26" height="10"><line x1="0" x2="26" y1="5" y2="5" stroke="${col}" stroke-width="3" ${dash ? 'stroke-dasharray="6 4"' : ''}/></svg>${lab}</span>`;
     return `<div class="row small" style="gap:18px">
         ${key('var(--bad)', false, `<b>SPE prediction</b> ${money(spe)}`)}
         ${paperMean != null ? key('var(--p2)', true, `<b>Paper mean</b> ${money(paperMean)}`) : ''}
