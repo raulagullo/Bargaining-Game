@@ -135,8 +135,9 @@ const FIREBASE_CONFIG = {
     databaseURL: "https://games-theory-project-default-rtdb.europe-west1.firebasedatabase.app"
   };
 
+
 const PIE1 = 500;               // first-stage pie, in cents ($5.00)
-const ACTIVE_MS = 60000;        // a player counts as active if seen in the last 60 s
+const ACTIVE_MS = 90000;        // a connected player counts as active if seen in the last 90 s
 const HEARTBEAT_MS = 10000;
 const ROOT = 'bargaining';
 
@@ -164,7 +165,13 @@ async function makeBackend() {
       get: async p => (await d.get(d.ref(db, p))).val(),
       set: (p, v) => d.set(d.ref(db, p), v),
       update: (p, o) => d.update(d.ref(db, p), o),
-      on: (p, cb, onErr) => d.onValue(d.ref(db, p), s => cb(s.val()), e => onErr && onErr(e))
+      on: (p, cb, onErr) => d.onValue(d.ref(db, p), s => cb(s.val()), e => onErr && onErr(e)),
+      ts: () => d.serverTimestamp(),
+      // presence: (re)announce on every (re)connection, and mark offline when the connection drops
+      presence: (p, onlineVal, offlineVal) => d.onValue(d.ref(db, '.info/connected'), s => {
+        if (s.val() !== true) return;
+        d.onDisconnect(d.ref(db, p)).update(offlineVal).then(() => d.update(d.ref(db, p), onlineVal()));
+      })
     };
   }
   const KEY = 'bgame-local-db';
@@ -194,6 +201,11 @@ async function makeBackend() {
       const s = { last: undefined, check() { const v = getAt(load(), p); const j = JSON.stringify(v); if (j !== s.last) { s.last = j; cb(v); } } };
       subs.add(s); setTimeout(() => s.check(), 0);
       return () => subs.delete(s);
+    },
+    ts: () => Date.now(),
+    presence: (p, onlineVal, offlineVal) => {
+      const t = load(); setAt(t, p + '/online', true); setAt(t, p + '/lastSeen', Date.now()); save(t); notify();
+      window.addEventListener('pagehide', () => { const t2 = load(); setAt(t2, p + '/online', false); save(t2); });
     }
   };
 }
@@ -216,6 +228,8 @@ function parseMoney(str, maxC) {
   if (!isFinite(v)) return null;
   return Math.max(0, Math.min(maxC, Math.round(v * 100)));
 }
+const isActive = (p, now) => !!p && p.online !== false && typeof p.lastSeen === 'number' && now - p.lastSeen < ACTIVE_MS;
+const countActive = (players, now) => Object.values(players || {}).filter(p => isActive(p, now)).length;
 const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : null;
 const sd = a => { if (a.length < 2) return null; const m = mean(a); return Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / (a.length - 1)); };
 const median = a => { if (!a.length) return null; const b = [...a].sort((x, y) => x - y); const h = b.length >> 1; return b.length % 2 ? b[h] : (b[h - 1] + b[h]) / 2; };
@@ -255,15 +269,20 @@ async function runPlayer(code) {
   const pidKey = 'bgame-pid-' + code;
   let pid = sessionStorage.getItem(pidKey);
   if (!pid) { pid = randId(); sessionStorage.setItem(pidKey, pid); }
-  const existing = await db.get(`${S}/players/${pid}`);
-  await db.update(`${S}/players/${pid}`, existing ? { lastSeen: db.now() } : { joinedAt: db.now(), lastSeen: db.now() });
-  setInterval(() => { if (document.visibilityState === 'visible') db.update(`${S}/players/${pid}`, { lastSeen: db.now() }); }, HEARTBEAT_MS);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') db.update(`${S}/players/${pid}`, { lastSeen: db.now() }); });
+  const me = `${S}/players/${pid}`;
+  const existing = await db.get(me);
+  if (!existing) await db.update(me, { joinedAt: db.ts() });
+  const beat = () => db.update(me, { lastSeen: db.ts(), online: true });
+  db.presence(me, () => ({ lastSeen: db.ts(), online: true }), { online: false });
+  setInterval(beat, HEARTBEAT_MS);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') beat(); });
 
-  const st = { code, S, pid, round: 0, roundInfo: null, assign: undefined, pair: null, nPlayers: 0 };
-  let unsubRound = [], lastKey = '', lastRoundSeen = 0;
+  const st = { code, S, pid, round: 0, roundInfo: null, assign: undefined, pair: null, nPlayers: 0, players: {} };
+  let unsubRound = [], lastKey = '';
 
-  db.on(`${S}/players`, v => { st.nPlayers = v ? Object.keys(v).length : 0; if (!st.round) render(true); });
+  const recount = () => { st.nPlayers = countActive(st.players, db.now()); if (!st.round) render(); };
+  db.on(`${S}/players`, v => { st.players = v || {}; recount(); });
+  setInterval(recount, 5000);
   db.on(`${S}/meta/round`, r => {
     r = r || 0;
     if (r === st.round) return;
@@ -315,13 +334,12 @@ async function runPlayer(code) {
     else if (!p) { view = 'loading'; key = 'loadingpair'; }
     else { view = 'game'; key = ['game', st.round, a.role, p.stage, p.x, p.a1, p.y, p.a2, st.roundStatus].join('|'); }
     if (key === lastKey && !force) return;
-    if (key === lastKey && view !== 'lobby') return;
     lastKey = key;
 
     if (view === 'lobby') {
       app.innerHTML = `<div class="wrap stack">
         <div class="center stack"><div class="eyebrow">Game Theory · Two-stage bargaining</div><h1>You're in!</h1></div>
-        ${waiting('Waiting for the presenter to start…', `${st.nPlayers} player${st.nPlayers === 1 ? '' : 's'} joined. You will be randomly paired with an anonymous classmate, and your role (Player 1 or Player 2) will be drawn at random.`)}
+        ${waiting('Waiting for the presenter to start…', `${st.nPlayers} player${st.nPlayers === 1 ? '' : 's'} connected. Keep this screen on. You will be randomly paired with an anonymous classmate, and your role (Player 1 or Player 2) will be drawn at random.`)}
         </div>`;
       return;
     }
@@ -471,8 +489,8 @@ function hostUI(code) {
           <div class="url"><a href="${esc(joinUrl)}" target="_blank" rel="noopener">${esc(joinUrl)}</a></div>
         </div>
         <div class="card stats">
-          <div class="stat"><div class="v" id="nActive">0</div><div class="l">active now</div></div>
-          <div class="stat"><div class="v" id="nJoined">0</div><div class="l">joined in total</div></div>
+          <div class="stat"><div class="v" id="nActive">0</div><div class="l">connected now</div></div>
+          <div class="stat"><div class="v" id="nPlaying">0</div><div class="l">playing this round</div></div>
         </div>
       </div>
       <div class="stack">
@@ -487,7 +505,7 @@ function hostUI(code) {
             <button class="btn primary" id="start">Pair players &amp; start round</button>
             <button class="btn" id="end">End current round</button>
           </div>
-          <p class="small muted" id="startHint">Players are paired at random among those active in the last minute; roles are drawn at random. With an odd number, one random player sits out.</p>
+          <p class="small muted" id="startHint">Players are paired at random among those connected right now; roles are drawn at random. With an odd number, one random player sits out.</p>
         </div>
         <div class="card stack" id="live"></div>
         <div class="card stack" id="results"></div>
@@ -521,7 +539,7 @@ function hostUI(code) {
     if (pie2 == null || pie2 <= 0 || pie2 >= PIE1) { alert('The second-stage pie must be between $0.01 and $4.99.'); return; }
     const players = (await db.get(`${S}/players`)) || {};
     const now = db.now();
-    const active = Object.entries(players).filter(([, p]) => now - (p.lastSeen || 0) < ACTIVE_MS).map(([id]) => id);
+    const active = Object.entries(players).filter(([, p]) => isActive(p, now)).map(([id]) => id);
     if (active.length < 2) { alert('At least 2 active players are needed.'); return; }
     const meta = (await db.get(`${S}/meta`)) || {};
     const prev = meta.round || 0, r = prev + 1;
@@ -553,11 +571,13 @@ function hostUI(code) {
 
   function paintCounts() {
     const now = db.now(), ps = Object.values(st.players);
-    $('#nJoined').textContent = ps.length;
-    $('#nActive').textContent = ps.filter(p => now - (p.lastSeen || 0) < ACTIVE_MS).length;
+    $('#nActive').textContent = ps.filter(p => isActive(p, now)).length;
+    const r = st.meta && st.meta.round, cur = r && st.rounds[r];
+    $('#nPlaying').textContent = cur && cur.status === 'open' ? 2 * Object.keys(cur.pairs || {}).length : 0;
   }
 
   function paint() {
+    paintCounts();
     const r = st.meta ? st.meta.round : 0;
     const cur = r ? st.rounds[r] : null;
     $('#roundState').textContent = cur ? `Round ${r} · ${cur.status === 'open' ? 'in progress' : 'ended'}` : 'No round yet';
